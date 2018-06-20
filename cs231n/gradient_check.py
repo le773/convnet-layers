@@ -1,3 +1,6 @@
+from __future__ import print_function
+#from past.builtins import xrange
+
 import numpy as np
 from random import randrange
 
@@ -44,9 +47,9 @@ def eval_numerical_gradient_array(f, x, df, h=1e-5):
     
     oldval = x[ix]
     x[ix] = oldval + h
-    pos = f(x)
+    pos = f(x).copy()
     x[ix] = oldval - h
-    neg = f(x)
+    neg = f(x).copy()
     x[ix] = oldval
     
     grad[ix] = np.sum((pos - neg) * df) / (2 * h)
@@ -101,21 +104,18 @@ def eval_numerical_gradient_net(net, inputs, output, h=1e-5):
               inputs, output, h=h)
 
 
-def grad_check_sparse(f, x, analytic_grad, num_checks):
+def grad_check_sparse(f, x, analytic_grad, num_checks=10, h=1e-5):
   """
   sample a few random elements and only return numerical
   in this dimensions.
   """
-  h = 1e-5
 
-  x.shape
-  for i in xrange(num_checks):
+  for i in range(num_checks):
     ix = tuple([randrange(m) for m in x.shape])
 
     oldval = x[ix]
     x[ix] = oldval + h # increment by h
     fxph = f(x) # evaluate f(x + h)
-    print(type(fxph), type(fxmh))
     x[ix] = oldval - h # increment by h
     fxmh = f(x) # evaluate f(x - h)
     x[ix] = oldval # reset

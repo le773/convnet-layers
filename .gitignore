@@ -1,5 +1,4 @@
-.ipynb_checkpoints/
-__pycache__/
 *.swp
 *.pyc
 .env/*
+.ipynb_checkpoints/
