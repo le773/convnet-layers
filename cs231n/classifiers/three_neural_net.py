@@ -19,7 +19,7 @@ class ThreeLayerNet(object):
   The outputs of the second fully-connected layer are the scores for each class.
   """
 
-  def __init__(self, input_size, hidden_size1, hidden_size2, output_size, std=1e-4):
+  def __init__(self, input_size, hidden_size1, hidden_size2, output_size, std=1e-2):
     """
     Initialize the model. Weights are initialized to small random values and
     biases are initialized to zero. Weights and biases are stored in the
@@ -80,9 +80,9 @@ class ThreeLayerNet(object):
     # shape (N, C).                                                             #
     #############################################################################
     out1 = X.dot(W1) + b1
-    relu_tmp = np.maximum(0.01*out1, 6*out1)
+    relu_tmp = np.maximum(0.01*out1, out1)
     scores_tmp = relu_tmp.dot(D1) + e1
-    relu = np.maximum(0.01*scores_tmp, 6*scores_tmp)
+    relu = np.maximum(0.01*scores_tmp, scores_tmp)
     scores = relu.dot(W2) + b2 
     #############################################################################
     #                              END OF YOUR CODE                             #
@@ -100,15 +100,24 @@ class ThreeLayerNet(object):
     # in the variable loss, which should be a scalar. Use the Softmax           #
     # classifier loss.                                                          #
     #############################################################################
-    # orig
+    # loss1.0
     # correct_class_score = scores[np.arange(N), y].reshape(N,1)
     # exp_sum = np.sum(np.exp(scores), axis = 1).reshape(N, 1)
     # loss = np.sum(np.log(exp_sum) - correct_class_score)
-    # new loss
-    f = scores - np.max(scores, axis = 1, keepdims = True)
-    loss = -f[range(N), y].sum() + np.log(np.exp(f).sum(axis = 1)).sum()
+    #############################################################################
+    # loss1.1
+#     f = scores - np.max(scores, axis = 1, keepdims = True)
+#     loss = -f[range(N), y].sum() + np.log(np.exp(f).sum(axis = 1)).sum()
+    #############################################################################
+    # loss1.2
+    exp_scores = np.exp(scores)
+    probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+    correct_logprobs = -np.log(probs[range(N),y])
+    loss = np.sum(correct_logprobs)
+    #############################################################################
+    # loss + reg
     loss = loss / N
-    loss += 0.33 * reg * np.sum(W1 * W1) + 0.33 * reg * np.sum(W2 * W2) +  0.34 * reg * np.sum(D1 * D1)
+    loss += 0.5 * reg * np.sum(W1 * W1) + 0.5 * reg * np.sum(W2 * W2) +  0.5 * reg * np.sum(D1 * D1)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -121,8 +130,12 @@ class ThreeLayerNet(object):
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
     # out layer
-    # p2 = np.exp(scores) / exp_sum # orig
-    p2 = np.exp(f) / np.exp(f).sum(axis = 1, keepdims = True) #new
+    # loss1.0
+    # p2 = np.exp(scores) / exp_sum
+    # loss1.1
+    # p2 = np.exp(f) / np.exp(f).sum(axis = 1, keepdims = True)
+    # loss1.2
+    p2 = probs
     p2[np.arange(N), y] += -1
     p2 /= N  #(N, C)
 #     print('p2:', p2)
