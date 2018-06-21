@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from past.builtins import xrange
 
-class TwoLayerNet(object):
+class ThreeLayerNet(object):
   """
   A two-layer fully-connected neural network. The net has an input dimension of
   N, a hidden layer dimension of H, and performs classification over C classes.
@@ -19,7 +19,7 @@ class TwoLayerNet(object):
   The outputs of the second fully-connected layer are the scores for each class.
   """
 
-  def __init__(self, input_size, hidden_size, output_size, std=1e-4):
+  def __init__(self, input_size, hidden_size1, hidden_size2, output_size, std=1e-4):
     """
     Initialize the model. Weights are initialized to small random values and
     biases are initialized to zero. Weights and biases are stored in the
@@ -36,9 +36,11 @@ class TwoLayerNet(object):
     - output_size: The number of classes C.
     """
     self.params = {}
-    self.params['W1'] = std * np.random.randn(input_size, hidden_size)
-    self.params['b1'] = np.zeros(hidden_size)
-    self.params['W2'] = std * np.random.randn(hidden_size, output_size)
+    self.params['W1'] = std * np.random.randn(input_size, hidden_size1)
+    self.params['b1'] = np.zeros(hidden_size1)
+    self.params['D1'] = std * np.random.randn(hidden_size1, hidden_size2)
+    self.params['e1'] = np.zeros(hidden_size2)
+    self.params['W2'] = std * np.random.randn(hidden_size2, output_size)
     self.params['b2'] = np.zeros(output_size)
 
   def loss(self, X, y=None, reg=0.0):
@@ -67,6 +69,7 @@ class TwoLayerNet(object):
     # Unpack variables from the params dictionary
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
+    D1, e1 = self.params['D1'], self.params['e1']
     N, D = X.shape
 
     # Compute the forward pass
@@ -77,7 +80,9 @@ class TwoLayerNet(object):
     # shape (N, C).                                                             #
     #############################################################################
     out1 = X.dot(W1) + b1
-    relu = np.maximum(0, out1)
+    relu_tmp = np.maximum(0.01*out1, 6*out1)
+    scores_tmp = relu_tmp.dot(D1) + e1
+    relu = np.maximum(0.01*scores_tmp, 6*scores_tmp)
     scores = relu.dot(W2) + b2 
     #############################################################################
     #                              END OF YOUR CODE                             #
@@ -95,11 +100,15 @@ class TwoLayerNet(object):
     # in the variable loss, which should be a scalar. Use the Softmax           #
     # classifier loss.                                                          #
     #############################################################################
-    correct_class_score = scores[np.arange(N), y].reshape(N,1)
-    exp_sum = np.sum(np.exp(scores), axis = 1).reshape(N, 1)
-    loss = np.sum(np.log(exp_sum) - correct_class_score)
-    loss /= N
-    loss += 0.5 * reg * np.sum(W1 * W1) + 0.5 * reg * np.sum(W2 * W2)
+    # orig
+    # correct_class_score = scores[np.arange(N), y].reshape(N,1)
+    # exp_sum = np.sum(np.exp(scores), axis = 1).reshape(N, 1)
+    # loss = np.sum(np.log(exp_sum) - correct_class_score)
+    # new loss
+    f = scores - np.max(scores, axis = 1, keepdims = True)
+    loss = -f[range(N), y].sum() + np.log(np.exp(f).sum(axis = 1)).sum()
+    loss = loss / N
+    loss += 0.33 * reg * np.sum(W1 * W1) + 0.33 * reg * np.sum(W2 * W2) +  0.34 * reg * np.sum(D1 * D1)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -111,7 +120,9 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    p2 = np.exp(scores) / exp_sum
+    # out layer
+    # p2 = np.exp(scores) / exp_sum # orig
+    p2 = np.exp(f) / np.exp(f).sum(axis = 1, keepdims = True) #new
     p2[np.arange(N), y] += -1
     p2 /= N  #(N, C)
 #     print('p2:', p2)
@@ -120,10 +131,25 @@ class TwoLayerNet(object):
     grads['W2'] = dW2
     grads['b2'] = np.sum(p2, axis = 0)
     
-    p1 = p2.dot(W2.T)
-    # print('p1')
+    # hiddlen2 layer
+    p1_tmp = p2.dot(W2.T)
+    # print('p1_tmp:')
+    # print(p1_tmp)
+    p1_tmp[relu <= 0] = 0
+    dD1 = relu_tmp.T.dot(p1_tmp)
+    dD1 += reg * D1
+    grads['D1'] = dD1
+    grads['e1'] = np.sum(p1_tmp, axis = 0)
+    
+    # hiddlen1 layer
+    # print('p1_tmp.shape:', p1_tmp.shape)
+    # print('D1.T shape:', D1.T.shape)
+    p1 = p1_tmp.dot(D1.T)
+    # print('p1 shape:', p1.shape)
+    # print('relu_tmp shape:', relu_tmp.shape)
+    # print('relu shape:', relu.shape)
     # print(p1)
-    p1[relu <= 0] = 0
+    p1[relu_tmp <= 0] = 0
     dW1 = X.T.dot(p1)
     dW1 += reg * W1
     grads['W1'] = dW1
@@ -193,6 +219,8 @@ class TwoLayerNet(object):
       self.params['b1'] -= learning_rate * grads['b1']
       self.params['W2'] -= learning_rate * grads['W2']
       self.params['b2'] -= learning_rate * grads['b2']
+      self.params['D1'] -= learning_rate * grads['D1']
+      self.params['e1'] -= learning_rate * grads['e1']
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -241,8 +269,10 @@ class TwoLayerNet(object):
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
     out1_pred = X.dot(self.params['W1']) + self.params['b1']
-    relu_pred = np.maximum(0, out1_pred)
-    scores_pred = relu_pred.dot(self.params['W2']) + self.params['b2']
+    relu_pred1 = np.maximum(0, out1_pred)
+    out2_pred = relu_pred1.dot(self.params['D1']) + self.params['e1']
+    relu2_pred = np.maximum(0, out2_pred)
+    scores_pred = relu2_pred.dot(self.params['W2']) + self.params['b2']
     y_pred = np.argmax(scores_pred, axis = 1)
     ###########################################################################
     #                              END OF YOUR CODE                           #
