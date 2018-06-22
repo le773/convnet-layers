@@ -3,6 +3,7 @@ from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
 from past.builtins import xrange
+import math
 
 def batchNormal(X_input):
     X_input -= np.mean(X_input, axis=0)
@@ -24,7 +25,7 @@ class ThreeLayerNet(object):
   The outputs of the second fully-connected layer are the scores for each class.
   """
 
-  def __init__(self, input_size, hidden_size1, hidden_size2, output_size, std=5e-2):
+  def __init__(self, input_size, hidden_size1, hidden_size2, output_size, std=1e-4):
     """
     Initialize the model. Weights are initialized to small random values and
     biases are initialized to zero. Weights and biases are stored in the
@@ -41,14 +42,14 @@ class ThreeLayerNet(object):
     - output_size: The number of classes C.
     """
     self.params = {}
-    if False:
+    if True:
         self.params['W1'] = std * np.random.randn(input_size, hidden_size1)
         self.params['b1'] = np.zeros(hidden_size1)
         self.params['D1'] = std * np.random.randn(hidden_size1, hidden_size2)
         self.params['e1'] = np.zeros(hidden_size2)
         self.params['W2'] = std * np.random.randn(hidden_size2, output_size)
         self.params['b2'] = np.zeros(output_size)
-    if True:
+    if False:
         self.params['W1'] = np.random.randn(input_size, hidden_size1) * np.sqrt(2.0/input_size)
         self.params['b1'] = np.zeros(hidden_size1)
         self.params['D1'] = np.random.randn(hidden_size1, hidden_size2) * np.sqrt(2.0/hidden_size1)
@@ -93,14 +94,14 @@ class ThreeLayerNet(object):
     # shape (N, C).                                                             #
     #############################################################################
     out1 = X.dot(W1) + b1
-    relu_tmp = np.maximum(0.01*out1, 6*out1)
-    U1 = (np.random.rand(*relu_tmp.shape) < dropout) / dropout # dropout: first dropout mask. Notice /p!
-    relu_tmp *= U1 # dropout: drop!
-    # relu_tmp = batchNormal(relu_tmp) // rm batch normal
+    relu_tmp = np.maximum(0.01*out1, out1)
+#     U1 = (np.random.rand(*relu_tmp.shape) < dropout)# / dropout # dropout: first dropout mask. Notice /p!
+#     relu_tmp *= U1 # dropout: drop!
+    relu_tmp = batchNormal(relu_tmp) # rm batch normal
     scores_tmp = relu_tmp.dot(D1) + e1
-    relu = np.maximum(0.01*scores_tmp, 6*scores_tmp)
-    U2 = (np.random.rand(*relu.shape) < dropout) / dropout # dropout:second dropout mask. Notice /p!
-    relu *= U2 # dropout: drop!
+    relu = np.maximum(0.01*scores_tmp, scores_tmp)
+#     U2 = (np.random.rand(*relu.shape) < dropout)# / dropout # dropout:second dropout mask. Notice /p!
+#     relu *= U2 # dropout: drop!
     scores = relu.dot(W2) + b2
     
     #############################################################################
@@ -136,7 +137,9 @@ class ThreeLayerNet(object):
     #############################################################################
     # loss + reg
     loss = loss / N
+    # regression1
     loss += 0.5 * reg * np.sum(W1 * W1) + 0.5 * reg * np.sum(W2 * W2) +  0.5 * reg * np.sum(D1 * D1)
+    # regression2
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -228,6 +231,8 @@ class ThreeLayerNet(object):
     loss_history = []
     train_acc_history = []
     val_acc_history = []
+    loss = 100000
+    old_loss = None
     print('iterations_per_epoch:{} num_train:{} batch_size:{} num_iters:{}'
           .format(iterations_per_epoch, num_train, batch_size, num_iters))
     for it in xrange(num_iters):
@@ -247,9 +252,17 @@ class ThreeLayerNet(object):
       #########################################################################
 
       # Compute loss and gradients using the current minibatch
-      loss, grads = self.loss(X_batch, y=y_batch, reg=reg)
+      old_loss = loss
+      loss, grads = self.loss(X_batch, y=y_batch, reg=reg)        
+      if loss - old_loss > 0.4 :
+        print('loss ascend ++ old_loss：{}  loss:{}'.format(old_loss, loss))
+        break
       loss_history.append(loss)
 
+      if loss < 1.2:
+        print('loss is enough, stop and validation')
+        break
+        
       #########################################################################
       # TODO: Use the gradients in the grads dictionary to update the         #
       # parameters of the network (stored in the dictionary self.params)      #
@@ -265,7 +278,9 @@ class ThreeLayerNet(object):
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
-
+      if math.isnan(loss) or loss < 1e-5:
+            print('loss miss')
+            break
       if verbose and it % 100 == 0:
         print('iteration %d / %d: loss %f' % (it, num_iters, loss))
 
