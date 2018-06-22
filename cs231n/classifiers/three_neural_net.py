@@ -4,6 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from past.builtins import xrange
 
+def batchNormal(X_input):
+    X_input -= np.mean(X_input, axis=0)
+    X_input /= np.std(X_input, axis=0)
+    return X_input
+
 class ThreeLayerNet(object):
   """
   A two-layer fully-connected neural network. The net has an input dimension of
@@ -19,7 +24,7 @@ class ThreeLayerNet(object):
   The outputs of the second fully-connected layer are the scores for each class.
   """
 
-  def __init__(self, input_size, hidden_size1, hidden_size2, output_size, std=1e-2):
+  def __init__(self, input_size, hidden_size1, hidden_size2, output_size, std=5e-2):
     """
     Initialize the model. Weights are initialized to small random values and
     biases are initialized to zero. Weights and biases are stored in the
@@ -36,14 +41,22 @@ class ThreeLayerNet(object):
     - output_size: The number of classes C.
     """
     self.params = {}
-    self.params['W1'] = std * np.random.randn(input_size, hidden_size1)
-    self.params['b1'] = np.zeros(hidden_size1)
-    self.params['D1'] = std * np.random.randn(hidden_size1, hidden_size2)
-    self.params['e1'] = np.zeros(hidden_size2)
-    self.params['W2'] = std * np.random.randn(hidden_size2, output_size)
-    self.params['b2'] = np.zeros(output_size)
+    if False:
+        self.params['W1'] = std * np.random.randn(input_size, hidden_size1)
+        self.params['b1'] = np.zeros(hidden_size1)
+        self.params['D1'] = std * np.random.randn(hidden_size1, hidden_size2)
+        self.params['e1'] = np.zeros(hidden_size2)
+        self.params['W2'] = std * np.random.randn(hidden_size2, output_size)
+        self.params['b2'] = np.zeros(output_size)
+    if True:
+        self.params['W1'] = np.random.randn(input_size, hidden_size1) * np.sqrt(2.0/input_size)
+        self.params['b1'] = np.zeros(hidden_size1)
+        self.params['D1'] = np.random.randn(hidden_size1, hidden_size2) * np.sqrt(2.0/hidden_size1)
+        self.params['e1'] = np.zeros(hidden_size2)
+        self.params['W2'] = np.random.randn(hidden_size2, output_size)/np.sqrt(hidden_size2)
+        self.params['b2'] = np.zeros(output_size)
 
-  def loss(self, X, y=None, reg=0.0):
+  def loss(self, X, y=None, reg=0.0, dropout=0.9):
     """
     Compute the loss and gradients for a two layer fully connected neural
     network.
@@ -80,10 +93,16 @@ class ThreeLayerNet(object):
     # shape (N, C).                                                             #
     #############################################################################
     out1 = X.dot(W1) + b1
-    relu_tmp = np.maximum(0.01*out1, out1)
+    relu_tmp = np.maximum(0.01*out1, 6*out1)
+    U1 = (np.random.rand(*relu_tmp.shape) < dropout) / dropout # dropout: first dropout mask. Notice /p!
+    relu_tmp *= U1 # dropout: drop!
+    # relu_tmp = batchNormal(relu_tmp) // rm batch normal
     scores_tmp = relu_tmp.dot(D1) + e1
-    relu = np.maximum(0.01*scores_tmp, scores_tmp)
-    scores = relu.dot(W2) + b2 
+    relu = np.maximum(0.01*scores_tmp, 6*scores_tmp)
+    U2 = (np.random.rand(*relu.shape) < dropout) / dropout # dropout:second dropout mask. Notice /p!
+    relu *= U2 # dropout: drop!
+    scores = relu.dot(W2) + b2
+    
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -132,10 +151,13 @@ class ThreeLayerNet(object):
     # out layer
     # loss1.0
     # p2 = np.exp(scores) / exp_sum
+    #############################################################################
     # loss1.1
     # p2 = np.exp(f) / np.exp(f).sum(axis = 1, keepdims = True)
+    #############################################################################
     # loss1.2
     p2 = probs
+    #############################################################################
     p2[np.arange(N), y] += -1
     p2 /= N  #(N, C)
 #     print('p2:', p2)
@@ -194,6 +216,12 @@ class ThreeLayerNet(object):
     - batch_size: Number of training examples to use per step.
     - verbose: boolean; if true print progress during optimization.
     """
+    #############################################################################
+    self.params['learning_rate'] = learning_rate
+    self.params['learning_rate_decay'] = learning_rate_decay
+    self.params['reg'] = reg
+    self.params['batch_size'] = batch_size
+    #############################################################################
     num_train = X.shape[0]
     iterations_per_epoch = max(num_train / batch_size, 1)
     # Use SGD to optimize the parameters in self.model
@@ -277,7 +305,7 @@ class ThreeLayerNet(object):
       to have class c, where 0 <= c < C.
     """
     y_pred = None
-
+    best_y_pred = 0.0
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
@@ -290,5 +318,17 @@ class ThreeLayerNet(object):
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
-
+    if False:
+        nNote = ['W1', 'D1', 'W2', 'b1', 'e1', 'b2']
+        if y_pred.any() > best_y_pred:
+            best_y_pred = y_pred
+            self.params['best_y_pred'] = best_y_pred
+            # 从字典写入csv文件
+            import csv
+            csvFile3 = open('csvFile3.csv','a', newline='') 
+            writer2 = csv.writer(csvFile3)
+            for key in self.params:
+                if key not in nNote:
+                    writer2.writerow([key, self.params[key]])
+            csvFile3.close()
     return y_pred
